@@ -1,2 +1,2 @@
-# course-recommender
-Course recommendation script for Stevens Institute of Technology
+# Gateway
+A service for retrieval-augmented course recommendations for Stevens Institute of Technology.
