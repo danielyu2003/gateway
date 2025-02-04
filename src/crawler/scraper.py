@@ -1,81 +1,87 @@
 import requests
 from bs4 import BeautifulSoup
+import time
+import random
+from typing import Generator, Tuple
+
 
 class CatalogScraper:
-    '''
-    Class for catalog scraping.
+    """
+    Scraper for Stevens Institute of Technology course catalog.
 
-    @member year: specifies course listing for the fall semester of the given
-    year and the spring semester of the subsequent year.
-    '''
-    def __init__(self, year: int):
-        self.year: int = year
-        
-    def get_courses(self, debug=False, debugLimit=211) -> tuple[str, str, str, str]:
-        '''
-        Crawls the Stevens Institute of Technology catalog page and yields
-        tuples containing course descriptions, codes, names, and links.
-        
-        @param debug: toggles printing of the urls being scraped.
-        @yield course: tuple[str, str, str]
-        @raise StopIteration: once there are no more courses to list.
-        @raise requests.exceptions.Error: if the request is bad.
-        @raise NotImplementedError: if there is not a div with the id of 'main'.
-        '''
-        base = "https://stevens.smartcatalogiq.com"
-        yearly_listing = f"{base}/en/{self.year}-{self.year+1}/academic-catalog/courses/"
+    Attributes:
+        year (int): Specifies course listings for the fall semester of the given year
+                    and the spring semester of the subsequent year.
+    """
+    BASE_URL = "https://stevens.smartcatalogiq.com"
 
-        response = requests.get(yearly_listing)
-        response.raise_for_status()
+    def __init__(self, year: int, delay_range: Tuple[int, int] = (1, 2)):
+        self.year = year
+        self.session = requests.Session()
+        self.session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"}) 
+        self.delay_range = delay_range
+
+    def _polite_delay(self):
+        """Adds a random delay between requests to avoid detection."""
+        time.sleep(random.uniform(*self.delay_range))
+
+    def get_courses(self) -> Generator[Tuple[str, str, str, str], None, None]:
+        """
+        Yields course descriptions, codes, names, and links from the catalog.
+
+        Yields:
+            Tuple[str, str, str, str]: A tuple containing the course description,
+                                       code, name, and page link.
+        Raises:
+            requests.exceptions.RequestException: For network-related errors.
+            ValueError: If the catalog structure is unexpected.
+        """
+        yearly_listing = f"{self.BASE_URL}/en/{self.year}-{self.year + 1}/academic-catalog/courses/"
+
+        try:
+            response = self.session.get(yearly_listing)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f"Failed to fetch the catalog page: {e}")
 
         soup = BeautifulSoup(response.content, 'html.parser')
         main_div = soup.find('div', id='main')
 
         if not main_div:
-            raise NotImplementedError
+            raise ValueError("Catalog structure has changed. 'main' div not found.")
 
         course_links = main_div.find_all('li')
 
-        if debug:
-            count = 0
-
         for li in course_links:
-
-            if debug:
-                count += 1
-                if count >= debugLimit:
-                    break
-
             a_tag = li.find('a')
-            if a_tag and a_tag.get('href'):
-                href = a_tag['href']
-                span_tag = a_tag.find('span')
-                course_code = span_tag.text.strip() if span_tag else None
-                course_name = a_tag.text.strip()
-                
-                if not course_code:
-                    continue
-                
-                course_name = course_name.replace(course_code, '').strip()
-                course_page = base + href
+            if not a_tag or not a_tag.get('href'):
+                continue
 
-                try:
-                    if debug:
-                        print(f"Fetching: {course_page}")
-                    course_response = requests.get(course_page)
-                    course_response.raise_for_status()
-                except Exception as ex:
-                    if debug:
-                        print(f"Failed to fetch {course_page}: {ex}")
-                    continue
+            href = a_tag['href']
+            course_page = f"{self.BASE_URL}{href}"
+            course_code = (a_tag.find('span').text.strip()
+                           if a_tag.find('span') else None)
+            course_name = a_tag.text.strip().replace(course_code or '', '').strip()
 
-                course_soup = BeautifulSoup(course_response.content, 'html.parser')
-                course_main_div = course_soup.find('div', id='main')
+            if not course_code:
+                continue
 
-                if not course_main_div:
-                    continue
-                
-                desc_div = course_main_div.find('div', class_='desc')
-                course_desc = desc_div.text.strip()
+            # Polite scraping
+            self._polite_delay()
 
-                yield course_desc, course_code, course_name, course_page
+            try:
+                course_response = self.session.get(course_page)
+                course_response.raise_for_status()
+            except requests.exceptions.RequestException:
+                continue  # Skip failed requests
+
+            course_soup = BeautifulSoup(course_response.content, 'html.parser')
+            course_main_div = course_soup.find('div', id='main')
+
+            if not course_main_div:
+                continue
+
+            desc_div = course_main_div.find('div', class_='desc')
+            course_desc = desc_div.text.strip() if desc_div else "No description available."
+
+            yield course_desc, course_code, course_name, course_page

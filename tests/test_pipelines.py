@@ -1,12 +1,15 @@
 from src.recommender.pipelines import CourseRecommender
 
-recommender = CourseRecommender(2024, k=1)
-recommender.index(2024, debug=True)
+recommender = CourseRecommender(2024)
 
-text = "What should I take if I want to learn about evolutionary algorithms?"
+# recommender.index()
 
-docs = recommender.query(text, debug=True)
+text = "What course should I take if I want to learn about evolutionary algorithms?"
+
+docs = recommender.query(text)
 
 courses = [doc.meta['name'] for doc in docs]
+
+print(courses)
 
 assert any("Evolutionary Algorithm" in name for name in courses)
