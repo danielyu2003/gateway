@@ -1,2 +1,2 @@
 # Gateway
-A service for retrieval-augmented course recommendations for Stevens Institute of Technology.
+A service for retrieval-augmented course recommendations at Stevens Institute of Technology.
