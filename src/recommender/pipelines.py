@@ -37,7 +37,7 @@ def recommendation_pipeline(client, year):
     template = f"""\
 Given the following information about courses from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, provide a descriptive answer to the question. The courses are ordered from most relevant to least relevant. Please include the course code and the link to the course catalog page in your answer. If the question asks for less courses than the amount listed, only describe the fewest courses as needed to answer it. Do not prompt the user to follow up.
 
-Courses: 
+Courses:
 \u007b% for doc in documents %\u007d
     \u007b\u007b loop.index \u007d\u007d. \u007b\u007b doc.meta['name'] \u007d\u007d
     \u007b\u007b doc.content \u007d\u007d
@@ -71,6 +71,7 @@ class CourseRecommender:
             table_name=f"f{year}_s{year+1}",
             keyword_index_name=f"f{year}_s{year+1}_index",
             embedding_dimension=768,
+            recreate_table = False,
             vector_function="cosine_similarity",
             search_strategy="exact_nearest_neighbor"
         )
