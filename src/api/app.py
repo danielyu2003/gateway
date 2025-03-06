@@ -15,7 +15,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-recommender = CourseRecommender(year=2024)
+recommender = CourseRecommender(year=2024, k=5)
 thread = threading.Thread(target=recommender.index, daemon=True)
 thread.start()
 

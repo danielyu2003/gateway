@@ -35,7 +35,7 @@ def querying_pipeline(document_store, k):
 
 def recommendation_pipeline(client, year):
     template = f"""\
-Given the following information about courses from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, provide a descriptive answer to the question. The courses are ordered from most relevant to least relevant. Please include the course code and the link to the course catalog page in your answer. If the question asks for less courses than the amount listed, only describe the fewest courses as needed to answer it. Do not prompt the user to follow up.
+Given the following information about courses from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, provide a descriptive answer to the question below. Please include the name, code, description, and link (in that order) of each course in your response. If the question asks for less courses than the amount listed, only describe the fewest courses needed. Do not prompt the user to follow up.
 
 Courses:
 \u007b% for doc in documents %\u007d
