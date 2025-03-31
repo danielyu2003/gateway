@@ -1,3 +1,4 @@
+import re
 from dotenv import load_dotenv
 from haystack import Document, Pipeline
 from haystack.utils import Secret
@@ -35,12 +36,15 @@ def querying_pipeline(document_store, k):
 
 def recommendation_pipeline(client, year):
     template = f"""\
-Given the following information about courses from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, provide a descriptive answer to the question below. Please include the name, code, description, and link (in that order) of each course in your response. If the question asks for less courses than the amount listed, only describe the fewest courses needed. Do not prompt the user to follow up.
+Given the recommended course listings from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, answer the question below.
+Please include the name, code, description, and link (in that order) of each course in your response.
+If the question asks for less courses than the amount listed, only describe the fewest courses needed.
+Do not prompt the user to follow up.
 
 Courses:
 \u007b% for doc in documents %\u007d
     \u007b\u007b loop.index \u007d\u007d. \u007b\u007b doc.meta['name'] \u007d\u007d
-    \u007b\u007b doc.content \u007d\u007d
+    \u007b\u007b doc.meta['desc'] \u007d\u007d
     Course code: \u007b\u007b doc.meta['code'] \u007d\u007d
     Link to catalog page: \u007b\u007b doc.meta['link'] \u007d\u007d
 \u007b% endfor %\u007d
@@ -53,7 +57,44 @@ Question: \u007b\u007b query \u007d\u007d?\
     recommender.connect("prompt_builder", "llm")
     return recommender
 
+# def evaluation_pipeline(flag_fail=False):
+#     evaluator = Pipeline()
+#     evaluator.add_component("context_relevance", ContextRelevanceEvaluator(raise_on_failure=flag_fail))
+#     evaluator.add_component("faithfulness", FaithfulnessEvaluator(raise_on_failure=flag_fail))
+#     evaluator.add_component("sas", SASEvaluator())
+#     evaluator.add_component("mrr", DocumentMRREvaluator())
+#     evaluator.add_component("recall", DocumentRecallEvaluator())
+#     evaluator.add_component("mape", DocumentMAPEvaluator())
+#     return evaluator
+
 # ------------------ Main Class ------------------ #
+
+class Preprocessor:
+    """
+    Class encapsulating logic for text preprocessing.
+    """
+    def __init__(self):
+        self.isNotAlpha = re.compile(r"[^a-z\s]+")  # Remove non-alphabetic characters
+        self.isUrl = re.compile(r"(https?://|www\.)\S+")  # Remove URLs
+        self.isStopword = re.compile(r"\b(i|me|my|...|now)\b")  # Remove common stopwords
+        self.isSuffix = re.compile(r"\B(ings?|e[sdr]|st?|ly|ment|ness|ion)\b")  # Remove common suffixes for stemming
+
+    def pipeline(self, text):
+        """
+        Apply text cleaning steps sequentially.
+
+        Args:
+            text (str): Raw text input.
+
+        Returns:
+            list of str: Processed word tokens.
+        """
+        line = text.lower() # first ensure that all text is lowercase
+        line = self.isUrl.sub('', line)
+        line = self.isNotAlpha.sub('', line)
+        line = self.isStopword.sub('', line)
+        line = self.isSuffix.sub('', line)
+        return line
 
 class CourseRecommender:
     def __init__(self, year, k=3):
@@ -80,12 +121,14 @@ class CourseRecommender:
         self.recommender = recommendation_pipeline(client, year)
 
     def index(self, batch_size=10):
+        preprocessing = Preprocessor()
         scraper = CatalogScraper(self.year)
         course_generator = scraper.get_courses()
         batch = []
         for course in course_generator:
             desc, code, name, link = course
-            doc = Document(content=desc, meta={"code": code, "name": name, "link": link})
+            text = preprocessing.pipeline(desc)
+            doc = Document(content=text, meta={"code": code, "name": name, "link": link, "desc": desc})
             batch.append(doc)
             if len(batch) >= batch_size:
                 logger.info(f"Indexing batch of size {batch_size}")
