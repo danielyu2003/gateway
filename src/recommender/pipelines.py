@@ -39,7 +39,9 @@ def recommendation_pipeline(client, year):
 Given the recommended course listings from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, answer the question below.
 Please include the name, code, description, and link (in that order) of each course in your response.
 If the question asks for less courses than the amount listed, only describe the fewest courses needed.
-Do not prompt the user to follow up.
+Please omit describing given courses that are irrelevant to the question.
+If there are no relevant courses, or if the question is academic but not asking recommendations, then recommend the user to meet with their academic advisor instead.
+Otherwise, do not prompt the user to follow up.
 
 Courses:
 \u007b% for doc in documents %\u007d
@@ -56,16 +58,6 @@ Question: \u007b\u007b query \u007d\u007d?\
     recommender.add_component("llm", client)
     recommender.connect("prompt_builder", "llm")
     return recommender
-
-# def evaluation_pipeline(flag_fail=False):
-#     evaluator = Pipeline()
-#     evaluator.add_component("context_relevance", ContextRelevanceEvaluator(raise_on_failure=flag_fail))
-#     evaluator.add_component("faithfulness", FaithfulnessEvaluator(raise_on_failure=flag_fail))
-#     evaluator.add_component("sas", SASEvaluator())
-#     evaluator.add_component("mrr", DocumentMRREvaluator())
-#     evaluator.add_component("recall", DocumentRecallEvaluator())
-#     evaluator.add_component("mape", DocumentMAPEvaluator())
-#     return evaluator
 
 # ------------------ Main Class ------------------ #
 
