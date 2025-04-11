@@ -1,4 +1,4 @@
-from haystack import Document, Pipeline
+from haystack import Pipeline
 from haystack.components.evaluators import SASEvaluator, DocumentMRREvaluator, DocumentRecallEvaluator, DocumentMAPEvaluator
 
 def evaluation_pipeline(flag_fail=False):
@@ -10,26 +10,51 @@ def evaluation_pipeline(flag_fail=False):
     return evaluator
 
 class SystemEvaluator:
-    def __init__(self):
-        pass
+    def __init__(self, model, store):
+        self.model = model
+        self.store = store
 
 if __name__ == "__main__":
-    pass
+    from src.recommender.pipelines import CourseRecommender
+    from haystack.components.retrievers import FilterRetriever
 
-    # from haystack import Document
-    # from haystack.components.retrievers import FilterRetriever
-    # from haystack.document_stores.in_memory import InMemoryDocumentStore
+    recommender = CourseRecommender(year=2024, k=5)
+    retriever = FilterRetriever(recommender.document_store)
 
-    # docs = [
-    # 	Document(content="Python is a popular programming language", meta={"lang": "en"}),
-    # 	Document(content="python ist eine beliebte Programmiersprache", meta={"lang": "de"}),
-    # ]
+    test_q = "As a CS major, what courses should I take if I am interested in machine learning?"
 
-    # doc_store = InMemoryDocumentStore()
-    # doc_store.write_documents(docs)
-    # retriever = FilterRetriever(doc_store)
-    # result = retriever.run(filters={"field": "lang", "operator": "==", "value": "en"})
+    result = retriever.run(filters={
+        "operator": "OR",
+        "conditions": [
+            {"field": "meta.code", "operator": "==", "value": "CS 559"},
+            {"field": "meta.code", "operator": "==", "value": "CS 560"},
+            {"field": "meta.code", "operator": "==", "value": "CS 583"},
+            {"field": "meta.code", "operator": "==", "value": "CS 541"},
+            {"field": "meta.code", "operator": "==", "value": "CS 556"}
+        ]
+    })
 
-    # assert "documents" in result
-    # assert len(result["documents"]) == 1
-    # assert result["documents"][0].content == "Python is a popular programming language"
+    docs = result['documents']
+    test_y = '\n'.join([f"{doc.meta['name']}:\n{doc.meta['desc']}\nCode: {doc.meta['code']}\nLink: {doc.meta['link']}\n" for doc in docs])
+
+    model_docs, model_response = recommender.recommend(test_q)
+
+    print(model_response)
+
+    for doc in docs:
+        print(doc.meta['code'])
+    print()
+    for doc in model_docs:
+        print(doc.meta['code'])
+
+    eval_pipe = evaluation_pipeline()
+
+    evals = eval_pipe.run({
+        "sas": {"ground_truth_answers": [test_y], "predicted_answers": [model_response]},
+        "mrr": {"ground_truth_documents": [docs], "retrieved_documents": [model_docs]},
+        "map": {"ground_truth_documents": [docs], "retrieved_documents": [model_docs]},
+        "recall": {"ground_truth_documents": [docs], "retrieved_documents": [model_docs]}
+    })
+
+    for metric in evals:
+        print(f"{metric}: {evals[metric]['score']}")

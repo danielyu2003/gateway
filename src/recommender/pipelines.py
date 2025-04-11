@@ -1,6 +1,7 @@
 import re
 from dotenv import load_dotenv
 from haystack import Document, Pipeline
+from haystack.components.preprocessors import DocumentCleaner
 from haystack.utils import Secret
 from haystack.document_stores.types import DuplicatePolicy
 from haystack.components.writers import DocumentWriter
@@ -22,8 +23,10 @@ logger = logging.getLogger(__name__)
 
 def indexing_pipeline(document_store):
     indexer = Pipeline()
+    indexer.add_component("cleaner", DocumentCleaner())
     indexer.add_component("embedder", SentenceTransformersDocumentEmbedder())
     indexer.add_component("writer", DocumentWriter(document_store, policy=DuplicatePolicy.SKIP))
+    indexer.connect("cleaner", "embedder")
     indexer.connect("embedder", "writer")
     return indexer
 
@@ -104,7 +107,7 @@ class CourseRecommender:
             table_name=f"f{year}_s{year+1}",
             keyword_index_name=f"f{year}_s{year+1}_index",
             embedding_dimension=768,
-            recreate_table = False,
+            recreate_table=False,
             vector_function="cosine_similarity",
             search_strategy="exact_nearest_neighbor"
         )
@@ -138,4 +141,4 @@ class CourseRecommender:
     def recommend(self, question):
         docs = self.query(question)
         response = self.recommender.run({'prompt_builder': {"documents": docs, "query": question}})
-        return response['llm']['replies'][0]  # Return only the generated reply
+        return docs, response['llm']['replies'][0]

@@ -24,5 +24,5 @@ class QueryRequest(BaseModel):
 
 @app.post("/api/recommend/")
 def get_recommendation(request: QueryRequest):
-    response = recommender.recommend(request.question)
+    _, response = recommender.recommend(request.question)
     return {"recommendation": response}
