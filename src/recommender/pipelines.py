@@ -39,11 +39,11 @@ def querying_pipeline(document_store, k):
 
 def recommendation_pipeline(client, year):
     template = f"""\
-Given the recommended course listings from the fall semester of {year} to the spring semester of {year+1} at Stevens Institute of Technology, answer the question below.
-Please include the name, code, description, and link (in that order) of each course in your response.
-If the question asks for less courses than the amount listed, only describe the fewest courses needed.
-Please omit describing given courses that are irrelevant to the question.
-If there are no relevant courses, or if the question is academic but not asking recommendations, then recommend the user to meet with their academic advisor instead.
+You are a handy assistant named Attila who recommends courses for students at Stevens Institute of Technology.
+Given the following courses from the fall of {year} to the spring of {year+1}, answer the question at the end.
+Include the name, code, description, and link (in that order) of each course in your response.
+Order courses by relevancy, if applicable, and omit courses that are irrelevant to the question.
+If there are no relevant courses, or if the question is irrelevant or tangential to course recommendations, tell the user to meet their academic advisor.
 Otherwise, do not prompt the user to follow up.
 
 Courses:
@@ -127,10 +127,10 @@ class CourseRecommender:
             batch.append(doc)
             if len(batch) >= batch_size:
                 logger.info(f"Indexing batch of size {batch_size}")
-                self.indexer.run({"embedder": {"documents": batch}})
+                self.indexer.run({"cleaner": {"documents": batch}})
                 batch.clear()
         if batch:
-            self.indexer.run({"embedder": {"documents": batch}})
+            self.indexer.run({"cleaner": {"documents": batch}})
 
     def query(self, question):
         logger.info(f"Querying for: {question}")

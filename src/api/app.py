@@ -1,28 +1,34 @@
 import threading
 from fastapi import FastAPI
 from pydantic import BaseModel
-from src.recommender.pipelines import CourseRecommender
-
 from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for testing (change in production)
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
-)
-
-recommender = CourseRecommender(year=2024, k=5)
-thread = threading.Thread(target=recommender.index, daemon=True)
-thread.start()
+from src.recommender.pipelines import CourseRecommender
 
 class QueryRequest(BaseModel):
     question: str
 
-@app.post("/api/recommend/")
-def get_recommendation(request: QueryRequest):
-    _, response = recommender.recommend(request.question)
-    return {"recommendation": response}
+def createApp(year=2024, k=7, startIndexing=False):
+
+    recommender = CourseRecommender(year=year, k=k)
+
+    if startIndexing:
+        thread = threading.Thread(target=recommender.index, daemon=True)
+        thread.start()
+
+    app = FastAPI()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    @app.post("/api/recommend/")
+    def get_recommendation(request: QueryRequest):
+        _, response = recommender.recommend(request.question)
+        return {"recommendation": response}
+
+    return app
+
+app = createApp()
